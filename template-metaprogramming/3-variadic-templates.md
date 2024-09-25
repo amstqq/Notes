@@ -71,7 +71,7 @@ x.B::execute();
 
 ### Parameter pack followed by another parameter pack
 A parameter pack can be followed by another parameter pack:
-
+```cpp
 template <typename... Ts, typename... Us>
 constexpr auto multipacks(Ts... args1, Us... args2)
 {
@@ -79,8 +79,6 @@ constexpr auto multipacks(Ts... args1, Us... args2)
               << sizeof...(args2) << '\n';
 };
 
-
-```cpp
 multipacks<int>(1, 2, 3, 4, 5, 6);
 // 1,5
 multipacks<int, int, int>(1, 2, 3, 4, 5, 6);
@@ -156,4 +154,133 @@ Benefits of fold expression:
 expression. However, this point may not be true in practice, at least not when
 optimizations are enabled. We have already seen that the compilers optimize code by removing these function calls.
 
+## Variadic class template example: Tuple
+### Tuple
+```cpp
+template<typename T, typename... Ts>
+class tuple
+{
+  public:
+    tuple(const T& t, const Ts&... ts)
+      : value(t)
+      , rest(ts...)
+      {}
+  
 
+  	T value;
+  	tuple<Ts...> rest;
+};
+
+template<typename T>
+class tuple<T>
+{
+  public:
+    tuple(const T& t)
+      : value(t)
+      {}
+   
+   	T value;
+};
+```
+
+### Nth type helper
+Define variadic class template that determines what the type of the element is at the N index of the tuple.
+```cpp
+template<size_t N, typename... Ts>
+struct nth_type : nth_type<N-1, Ts...>
+{
+};
+
+template<typename T, typename... Ts>
+struct nth_type<0, T, Ts...>
+{
+  using value_type = T;
+};
+```
+
+Flattened template from cppinsights.io
+```cpp
+template<>
+struct nth_type<2, int, double, char> : public nth_type<1, double, char>
+{ };
+
+template<>
+struct nth_type<1, double, char> : public nth_type<0, char>
+{ };
+
+template<>
+struct nth_type<0, char>
+{
+    using value_type = char;
+};
+```
+Note that type of nth element in tuple is determined at compile time.
+
+### Nth value helper
+
+```cpp
+template<size_t N>
+struct getter
+{
+   template <typename... Ts>
+   static typename nth_type<N, Ts...>::value_type get(const tuple<Ts...>& t)
+   {
+     return getter<N-1>::get(t.rest);
+   }
+};
+
+template<>
+struct getter<0>
+{
+	template <typename T, typename... Ts>
+    static const T& get(const tuple<T, Ts...>& t)
+    {
+    	return t.value;
+	}
+};
+```
+
+Flattened:
+```cpp
+template<>
+struct getter<2>
+{
+    template<>
+    static inline typename
+    nth_type<2UL, int, double, char>::value_type& 
+    get<int, double, char>(tuple<int, double, char> & t)
+    {
+        return getter<1>::get(t.rest);
+    }
+};
+
+template<>
+struct getter<1>
+{
+    template<>
+    static inline typename nth_type<1UL, double, char>::value_type&
+    get<double, char>(tuple<double, char> & t)
+    {
+        return getter<0>::get(t.rest);
+    }
+};
+
+template<>
+struct getter<0>
+{
+    template<>
+    static inline char & get<char>(tuple<char> & t)
+    {
+        return t.value;
+    }
+};
+```
+
+Finally, the get function:
+```cpp
+template<size_t N, typename... Ts>
+typename nth_type<N, Ts...>::value_type get(const tuple<Ts...>& t)
+{
+  return getter<N>::get(t);
+}
+```

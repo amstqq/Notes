@@ -1,6 +1,6 @@
 ## Non-type template parameters
 Parameters supplied with compile-time expressions are called non-type template parameters. This category of parameters can only have a structural type. The following are the structural types:
-Integral types
+- Integral types
 - Floating-point types, as of C++20
 - Enumerations
 - Pointer types (either to objects or functions)
